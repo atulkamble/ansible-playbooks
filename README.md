@@ -1,4 +1,4 @@
-Here’s a **starter collection of Ansible Playbook templates for Amazon Linux hosts**, covering common scenarios like **package installation, service management, file configuration, and EC2-specific tasks**.
+**starter collection of Ansible Playbook templates for Amazon Linux hosts**, covering common scenarios like **package installation, service management, file configuration, and EC2-specific tasks**.
 
 ---
 
