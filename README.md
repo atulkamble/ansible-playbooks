@@ -92,7 +92,7 @@ sudo ansible-playbook -i inventory/hosts playbooks/update.yml
 ```yaml
 ---
 - name: Install Docker on Amazon Linux 2
-  hosts: amazon_linux
+  hosts: all
   become: true
 
   tasks:
