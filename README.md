@@ -35,7 +35,7 @@ sudo ansible-playbook -i inventory/hosts playbooks/update.yml
 ```yaml
 ---
 - name: Install and configure Apache on Amazon Linux
-  hosts: amazon_linux
+  hosts: web
   become: true
 
   tasks:
