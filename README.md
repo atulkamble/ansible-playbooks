@@ -7,7 +7,7 @@
 ```yaml
 ---
 - name: Basic setup for Amazon Linux
-  hosts: amazon_linux
+  hosts: all
   become: true
 
   tasks:
@@ -22,6 +22,7 @@
           - git
           - wget
           - unzip
+          - tree
         state: present
 ```
 
