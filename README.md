@@ -25,7 +25,9 @@
           - tree
         state: present
 ```
-
+```
+sudo ansible-playbook -i inventory/hosts playbooks/update.yml
+```
 ---
 
 ## 2. **Apache Web Server Deployment**
