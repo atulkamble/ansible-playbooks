@@ -217,7 +217,7 @@ sudo ansible-playbook -i inventory/hosts playbooks/update.yml
 ```yaml
 ---
 - name: Install Python3 and pip on Amazon Linux
-  hosts: amazon_linux
+  hosts: all
   become: true
 
   tasks:
