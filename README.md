@@ -146,7 +146,7 @@ sudo ansible-playbook -i inventory/hosts playbooks/update.yml
 ```yaml
 ---
 - name: Install and configure Nginx as reverse proxy
-  hosts: amazon_linux
+  hosts: all
   become: true
 
   tasks:
