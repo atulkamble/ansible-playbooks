@@ -1,0 +1,7 @@
+---
+# Database specific variables
+mysql_port: 3306
+mysql_max_connections: 200
+mysql_innodb_buffer_pool_size: 1G
+backup_dir: /var/backups/mysql
+backup_retention_days: 7

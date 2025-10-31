@@ -1,0 +1,62 @@
+---
+# Basic Playbook 3: File and Directory Management
+- name: Manage Files and Directories
+  hosts: all
+  become: true
+
+  vars:
+    app_directories:
+      - /opt/myapp
+      - /opt/myapp/logs
+      - /opt/myapp/config
+      - /opt/myapp/data
+
+  tasks:
+    - name: Create application directories
+      file:
+        path: "{{ item }}"
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+      loop: "{{ app_directories }}"
+
+    - name: Create a sample configuration file
+      copy:
+        content: |
+          # Application Configuration
+          APP_NAME=MyApplication
+          APP_VERSION=1.0.0
+          APP_ENV=production
+          LOG_LEVEL=info
+        dest: /opt/myapp/config/app.conf
+        owner: root
+        group: root
+        mode: '0644'
+
+    - name: Create a template file
+      template:
+        src: templates/sample.j2
+        dest: /opt/myapp/config/sample.conf
+        owner: root
+        group: root
+        mode: '0644'
+      ignore_errors: yes
+
+    - name: Copy files from local to remote
+      copy:
+        src: files/
+        dest: /opt/myapp/data/
+        owner: root
+        group: root
+        mode: '0644'
+      ignore_errors: yes
+
+    - name: Check if file exists
+      stat:
+        path: /opt/myapp/config/app.conf
+      register: config_file
+
+    - name: Display file status
+      debug:
+        msg: "Configuration file exists: {{ config_file.stat.exists }}"

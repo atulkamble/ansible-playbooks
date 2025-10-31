@@ -1,0 +1,326 @@
+---
+# Advanced Playbook 4: Complete CI/CD Pipeline Setup
+- name: Deploy Jenkins CI/CD Pipeline
+  hosts: all
+  become: true
+
+  vars:
+    jenkins_port: 8080
+    jenkins_home: /var/lib/jenkins
+    jenkins_admin_user: admin
+    jenkins_plugins:
+      - git
+      - workflow-aggregator
+      - docker-workflow
+      - ansible
+      - kubernetes
+      - prometheus
+      - blueocean
+
+  tasks:
+    - name: Install Java (OpenJDK 11)
+      yum:
+        name: java-11-openjdk-devel
+        state: present
+      when: ansible_os_family == "RedHat"
+
+    - name: Add Jenkins repository
+      yum_repository:
+        name: jenkins
+        description: Jenkins Repository
+        baseurl: https://pkg.jenkins.io/redhat-stable
+        enabled: yes
+        gpgcheck: yes
+        gpgkey: https://pkg.jenkins.io/redhat-stable/jenkins.io-2023.key
+      when: ansible_os_family == "RedHat"
+
+    - name: Install Jenkins
+      yum:
+        name: jenkins
+        state: present
+      when: ansible_os_family == "RedHat"
+
+    - name: Create Jenkins custom configuration
+      copy:
+        content: |
+          JENKINS_HOME="{{ jenkins_home }}"
+          JENKINS_USER="jenkins"
+          JENKINS_PORT="{{ jenkins_port }}"
+          JENKINS_JAVA_OPTIONS="-Djava.awt.headless=true -Xmx2g -Xms1g"
+        dest: /etc/sysconfig/jenkins
+        owner: root
+        group: root
+        mode: '0644'
+      when: ansible_os_family == "RedHat"
+      notify: restart jenkins
+
+    - name: Start and enable Jenkins
+      service:
+        name: jenkins
+        state: started
+        enabled: yes
+
+    - name: Wait for Jenkins to start
+      wait_for:
+        port: "{{ jenkins_port }}"
+        delay: 10
+        timeout: 300
+
+    - name: Get Jenkins initial admin password
+      slurp:
+        src: "{{ jenkins_home }}/secrets/initialAdminPassword"
+      register: jenkins_password
+      ignore_errors: yes
+
+    - name: Display Jenkins initial password
+      debug:
+        msg: "Jenkins initial admin password: {{ jenkins_password.content | b64decode }}"
+      when: jenkins_password is succeeded
+
+    - name: Install Jenkins CLI
+      get_url:
+        url: "http://localhost:{{ jenkins_port }}/jnlpJars/jenkins-cli.jar"
+        dest: /opt/jenkins-cli.jar
+        mode: '0644'
+      retries: 5
+      delay: 10
+      ignore_errors: yes
+
+    - name: Create Jenkins job configuration directory
+      file:
+        path: "{{ jenkins_home }}/jobs/sample-pipeline"
+        state: directory
+        owner: jenkins
+        group: jenkins
+        mode: '0755'
+
+    - name: Create sample Jenkins pipeline job
+      copy:
+        content: |
+          <?xml version='1.1' encoding='UTF-8'?>
+          <flow-definition plugin="workflow-job@2.40">
+            <description>Sample CI/CD Pipeline</description>
+            <keepDependencies>false</keepDependencies>
+            <properties/>
+            <definition class="org.jenkinsci.plugins.workflow.cps.CpsFlowDefinition" plugin="workflow-cps@2.90">
+              <script>
+                pipeline {
+                    agent any
+                    
+                    environment {
+                        APP_NAME = 'myapp'
+                        APP_VERSION = "${env.BUILD_NUMBER}"
+                        DOCKER_REGISTRY = 'registry.example.com'
+                    }
+                    
+                    stages {
+                        stage('Checkout') {
+                            steps {
+                                echo 'Checking out code...'
+                                // git branch: 'main', url: 'https://github.com/example/repo.git'
+                            }
+                        }
+                        
+                        stage('Build') {
+                            steps {
+                                echo 'Building application...'
+                                sh 'echo "Build ${APP_VERSION}"'
+                            }
+                        }
+                        
+                        stage('Test') {
+                            steps {
+                                echo 'Running tests...'
+                                sh 'echo "Running unit tests"'
+                            }
+                        }
+                        
+                        stage('Docker Build') {
+                            steps {
+                                echo 'Building Docker image...'
+                                sh '''
+                                    echo "FROM nginx:alpine" > Dockerfile
+                                    echo "COPY . /usr/share/nginx/html" >> Dockerfile
+                                '''
+                            }
+                        }
+                        
+                        stage('Deploy to Staging') {
+                            steps {
+                                echo 'Deploying to staging...'
+                                sh 'echo "Deploying ${APP_NAME}:${APP_VERSION} to staging"'
+                            }
+                        }
+                        
+                        stage('Integration Tests') {
+                            steps {
+                                echo 'Running integration tests...'
+                                sh 'echo "Integration tests passed"'
+                            }
+                        }
+                        
+                        stage('Deploy to Production') {
+                            when {
+                                branch 'main'
+                            }
+                            steps {
+                                input message: 'Deploy to production?', ok: 'Deploy'
+                                echo 'Deploying to production...'
+                                sh 'echo "Deploying ${APP_NAME}:${APP_VERSION} to production"'
+                            }
+                        }
+                    }
+                    
+                    post {
+                        success {
+                            echo 'Pipeline succeeded!'
+                        }
+                        failure {
+                            echo 'Pipeline failed!'
+                        }
+                        always {
+                            echo 'Pipeline finished.'
+                        }
+                    }
+                }
+              </script>
+              <sandbox>true</sandbox>
+            </definition>
+            <triggers/>
+            <disabled>false</disabled>
+          </flow-definition>
+        dest: "{{ jenkins_home }}/jobs/sample-pipeline/config.xml"
+        owner: jenkins
+        group: jenkins
+        mode: '0644'
+      notify: restart jenkins
+
+    - name: Install GitLab Runner for CI/CD
+      block:
+        - name: Add GitLab Runner repository
+          yum_repository:
+            name: runner_gitlab-runner
+            description: GitLab Runner Repository
+            baseurl: https://packages.gitlab.com/runner/gitlab-runner/el/7/$basearch
+            enabled: yes
+            gpgcheck: no
+          when: ansible_os_family == "RedHat"
+
+        - name: Install GitLab Runner
+          yum:
+            name: gitlab-runner
+            state: present
+          when: ansible_os_family == "RedHat"
+
+        - name: Create GitLab Runner configuration
+          copy:
+            content: |
+              concurrent = 4
+              check_interval = 0
+              
+              [session_server]
+                session_timeout = 1800
+              
+              [[runners]]
+                name = "{{ ansible_hostname }}"
+                url = "https://gitlab.com/"
+                token = "GITLAB_RUNNER_TOKEN"
+                executor = "docker"
+                [runners.custom_build_dir]
+                [runners.cache]
+                  [runners.cache.s3]
+                  [runners.cache.gcs]
+                  [runners.cache.azure]
+                [runners.docker]
+                  tls_verify = false
+                  image = "alpine:latest"
+                  privileged = true
+                  disable_entrypoint_overwrite = false
+                  oom_kill_disable = false
+                  disable_cache = false
+                  volumes = ["/cache"]
+                  shm_size = 0
+            dest: /etc/gitlab-runner/config.toml
+            owner: root
+            group: root
+            mode: '0600'
+
+    - name: Create deployment scripts directory
+      file:
+        path: /opt/deployment-scripts
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+
+    - name: Create automated deployment script
+      copy:
+        content: |
+          #!/bin/bash
+          # Automated Deployment Script
+          
+          set -e
+          
+          APP_NAME="${1:-myapp}"
+          APP_VERSION="${2:-latest}"
+          ENVIRONMENT="${3:-staging}"
+          
+          echo "=== Deployment Started ==="
+          echo "Application: $APP_NAME"
+          echo "Version: $APP_VERSION"
+          echo "Environment: $ENVIRONMENT"
+          echo "Timestamp: $(date)"
+          
+          # Pre-deployment checks
+          echo "Running pre-deployment checks..."
+          if ! curl -f http://localhost/health > /dev/null 2>&1; then
+              echo "Warning: Health check endpoint not responding"
+          fi
+          
+          # Backup current version
+          echo "Creating backup..."
+          if [ -d "/opt/$APP_NAME" ]; then
+              tar -czf "/var/backups/${APP_NAME}-$(date +%Y%m%d-%H%M%S).tar.gz" "/opt/$APP_NAME"
+          fi
+          
+          # Deploy new version
+          echo "Deploying version $APP_VERSION..."
+          # Add your deployment logic here
+          
+          # Post-deployment verification
+          echo "Verifying deployment..."
+          sleep 5
+          
+          if curl -f http://localhost/health > /dev/null 2>&1; then
+              echo "=== Deployment Successful ==="
+              exit 0
+          else
+              echo "=== Deployment Failed - Health check failed ==="
+              exit 1
+          fi
+        dest: /opt/deployment-scripts/deploy.sh
+        owner: root
+        group: root
+        mode: '0755'
+
+    - name: Configure firewall for Jenkins
+      firewalld:
+        port: "{{ jenkins_port }}/tcp"
+        permanent: yes
+        state: enabled
+        immediate: yes
+      when: ansible_os_family == "RedHat"
+      ignore_errors: yes
+
+    - name: Display Jenkins information
+      debug:
+        msg:
+          - "Jenkins URL: http://{{ ansible_default_ipv4.address }}:{{ jenkins_port }}"
+          - "Jenkins home: {{ jenkins_home }}"
+          - "Check /var/lib/jenkins/secrets/initialAdminPassword for initial password"
+
+  handlers:
+    - name: restart jenkins
+      service:
+        name: jenkins
+        state: restarted

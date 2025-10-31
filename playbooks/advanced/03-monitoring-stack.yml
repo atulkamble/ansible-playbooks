@@ -1,0 +1,324 @@
+---
+# Advanced Playbook 3: Monitoring Stack with Prometheus and Grafana
+- name: Deploy Monitoring Stack
+  hosts: all
+  become: true
+
+  vars:
+    prometheus_version: "2.47.0"
+    grafana_version: "latest"
+    node_exporter_version: "1.6.1"
+    alertmanager_version: "0.26.0"
+    
+    prometheus_retention_time: "30d"
+    prometheus_storage_path: /var/lib/prometheus
+    
+    alertmanager_slack_webhook: "https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK"
+    alertmanager_email: "alerts@example.com"
+
+  tasks:
+    - name: Create Prometheus user
+      user:
+        name: prometheus
+        system: yes
+        shell: /bin/false
+        create_home: no
+
+    - name: Create Prometheus directories
+      file:
+        path: "{{ item }}"
+        state: directory
+        owner: prometheus
+        group: prometheus
+        mode: '0755'
+      loop:
+        - /etc/prometheus
+        - /etc/prometheus/rules
+        - /etc/prometheus/file_sd
+        - "{{ prometheus_storage_path }}"
+
+    - name: Download and extract Prometheus
+      unarchive:
+        src: "https://github.com/prometheus/prometheus/releases/download/v{{ prometheus_version }}/prometheus-{{ prometheus_version }}.linux-amd64.tar.gz"
+        dest: /tmp
+        remote_src: yes
+        creates: /tmp/prometheus-{{ prometheus_version }}.linux-amd64
+
+    - name: Copy Prometheus binaries
+      copy:
+        src: "/tmp/prometheus-{{ prometheus_version }}.linux-amd64/{{ item }}"
+        dest: /usr/local/bin/
+        remote_src: yes
+        owner: prometheus
+        group: prometheus
+        mode: '0755'
+      loop:
+        - prometheus
+        - promtool
+
+    - name: Create Prometheus configuration
+      copy:
+        content: |
+          global:
+            scrape_interval: 15s
+            evaluation_interval: 15s
+            external_labels:
+              cluster: 'production'
+              region: 'us-east-1'
+          
+          alerting:
+            alertmanagers:
+              - static_configs:
+                  - targets:
+                      - localhost:9093
+          
+          rule_files:
+            - "/etc/prometheus/rules/*.yml"
+          
+          scrape_configs:
+            - job_name: 'prometheus'
+              static_configs:
+                - targets: ['localhost:9090']
+            
+            - job_name: 'node_exporter'
+              static_configs:
+                - targets:
+          {% for host in groups['all'] %}
+                    - '{{ hostvars[host]['ansible_default_ipv4']['address'] }}:9100'
+          {% endfor %}
+            
+            - job_name: 'mysql'
+              static_configs:
+                - targets:
+          {% for host in groups['databases'] %}
+                    - '{{ hostvars[host]['ansible_default_ipv4']['address'] }}:9104'
+          {% endfor %}
+            
+            - job_name: 'apache'
+              static_configs:
+                - targets:
+          {% for host in groups['webservers'] %}
+                    - '{{ hostvars[host]['ansible_default_ipv4']['address'] }}:9117'
+          {% endfor %}
+        dest: /etc/prometheus/prometheus.yml
+        owner: prometheus
+        group: prometheus
+        mode: '0644'
+      notify: restart prometheus
+
+    - name: Create Prometheus alerting rules
+      copy:
+        content: |
+          groups:
+            - name: instance_alerts
+              interval: 30s
+              rules:
+                - alert: InstanceDown
+                  expr: up == 0
+                  for: 5m
+                  labels:
+                    severity: critical
+                  annotations:
+                    summary: "Instance {{ $labels.instance }} down"
+                    description: "{{ $labels.instance }} of job {{ $labels.job }} has been down for more than 5 minutes."
+                
+                - alert: HighCPUUsage
+                  expr: 100 - (avg by(instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+                  for: 10m
+                  labels:
+                    severity: warning
+                  annotations:
+                    summary: "High CPU usage on {{ $labels.instance }}"
+                    description: "CPU usage is above 80% for more than 10 minutes."
+                
+                - alert: HighMemoryUsage
+                  expr: (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes * 100 > 85
+                  for: 10m
+                  labels:
+                    severity: warning
+                  annotations:
+                    summary: "High memory usage on {{ $labels.instance }}"
+                    description: "Memory usage is above 85% for more than 10 minutes."
+                
+                - alert: DiskSpaceLow
+                  expr: (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"}) * 100 < 15
+                  for: 5m
+                  labels:
+                    severity: warning
+                  annotations:
+                    summary: "Low disk space on {{ $labels.instance }}"
+                    description: "Disk space is below 15% on root filesystem."
+        dest: /etc/prometheus/rules/alerts.yml
+        owner: prometheus
+        group: prometheus
+        mode: '0644'
+      notify: restart prometheus
+
+    - name: Create Prometheus systemd service
+      copy:
+        content: |
+          [Unit]
+          Description=Prometheus Time Series Database
+          After=network.target
+          
+          [Service]
+          Type=simple
+          User=prometheus
+          Group=prometheus
+          ExecStart=/usr/local/bin/prometheus \
+            --config.file=/etc/prometheus/prometheus.yml \
+            --storage.tsdb.path={{ prometheus_storage_path }} \
+            --storage.tsdb.retention.time={{ prometheus_retention_time }} \
+            --web.console.templates=/etc/prometheus/consoles \
+            --web.console.libraries=/etc/prometheus/console_libraries \
+            --web.listen-address=0.0.0.0:9090
+          
+          Restart=always
+          RestartSec=10
+          
+          [Install]
+          WantedBy=multi-user.target
+        dest: /etc/systemd/system/prometheus.service
+        owner: root
+        group: root
+        mode: '0644'
+      notify: restart prometheus
+
+    - name: Download and install Node Exporter
+      unarchive:
+        src: "https://github.com/prometheus/node_exporter/releases/download/v{{ node_exporter_version }}/node_exporter-{{ node_exporter_version }}.linux-amd64.tar.gz"
+        dest: /tmp
+        remote_src: yes
+        creates: /tmp/node_exporter-{{ node_exporter_version }}.linux-amd64
+
+    - name: Copy Node Exporter binary
+      copy:
+        src: "/tmp/node_exporter-{{ node_exporter_version }}.linux-amd64/node_exporter"
+        dest: /usr/local/bin/
+        remote_src: yes
+        owner: root
+        group: root
+        mode: '0755'
+
+    - name: Create Node Exporter systemd service
+      copy:
+        content: |
+          [Unit]
+          Description=Prometheus Node Exporter
+          After=network.target
+          
+          [Service]
+          Type=simple
+          User=prometheus
+          Group=prometheus
+          ExecStart=/usr/local/bin/node_exporter \
+            --collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)
+          
+          Restart=always
+          RestartSec=10
+          
+          [Install]
+          WantedBy=multi-user.target
+        dest: /etc/systemd/system/node_exporter.service
+        owner: root
+        group: root
+        mode: '0644'
+      notify: restart node_exporter
+
+    - name: Install Grafana repository
+      yum_repository:
+        name: grafana
+        description: Grafana Repository
+        baseurl: https://packages.grafana.com/oss/rpm
+        enabled: yes
+        gpgcheck: yes
+        gpgkey: https://packages.grafana.com/gpg.key
+      when: ansible_os_family == "RedHat"
+
+    - name: Install Grafana
+      yum:
+        name: grafana
+        state: present
+      when: ansible_os_family == "RedHat"
+
+    - name: Configure Grafana
+      copy:
+        content: |
+          [server]
+          protocol = http
+          http_port = 3000
+          domain = {{ ansible_hostname }}
+          
+          [security]
+          admin_user = admin
+          admin_password = admin
+          
+          [users]
+          allow_sign_up = false
+          
+          [auth.anonymous]
+          enabled = false
+        dest: /etc/grafana/grafana.ini
+        owner: root
+        group: grafana
+        mode: '0640'
+      notify: restart grafana
+
+    - name: Start and enable services
+      systemd:
+        name: "{{ item }}"
+        state: started
+        enabled: yes
+        daemon_reload: yes
+      loop:
+        - prometheus
+        - node_exporter
+        - grafana-server
+
+    - name: Configure firewall for monitoring services
+      firewalld:
+        port: "{{ item }}"
+        permanent: yes
+        state: enabled
+        immediate: yes
+      loop:
+        - 9090/tcp  # Prometheus
+        - 9100/tcp  # Node Exporter
+        - 3000/tcp  # Grafana
+      when: ansible_os_family == "RedHat"
+      ignore_errors: yes
+
+    - name: Wait for Prometheus to be ready
+      uri:
+        url: http://localhost:9090/-/ready
+        status_code: 200
+      register: prometheus_ready
+      until: prometheus_ready.status == 200
+      retries: 12
+      delay: 5
+      ignore_errors: yes
+
+    - name: Display monitoring URLs
+      debug:
+        msg:
+          - "Prometheus: http://{{ ansible_default_ipv4.address }}:9090"
+          - "Grafana: http://{{ ansible_default_ipv4.address }}:3000 (admin/admin)"
+          - "Node Exporter: http://{{ ansible_default_ipv4.address }}:9100/metrics"
+
+  handlers:
+    - name: restart prometheus
+      systemd:
+        name: prometheus
+        state: restarted
+        daemon_reload: yes
+
+    - name: restart node_exporter
+      systemd:
+        name: node_exporter
+        state: restarted
+        daemon_reload: yes
+
+    - name: restart grafana
+      systemd:
+        name: grafana-server
+        state: restarted

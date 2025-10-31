@@ -1,0 +1,23 @@
+---
+# Global variables for all hosts
+ansible_user: ec2-user
+timezone: America/New_York
+ntp_servers:
+  - 0.pool.ntp.org
+  - 1.pool.ntp.org
+
+# Common packages
+common_packages:
+  - git
+  - wget
+  - curl
+  - vim
+  - htop
+  - tree
+  - net-tools
+
+# Security settings
+ssh_port: 22
+allowed_ssh_users:
+  - ec2-user
+  - ansible

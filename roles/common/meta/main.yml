@@ -1,0 +1,24 @@
+---
+# Ansible Role: Common Configuration
+dependencies: []
+
+galaxy_info:
+  author: Ansible User
+  description: Common system configuration tasks
+  company: Your Company
+  license: MIT
+  min_ansible_version: 2.9
+  platforms:
+    - name: EL
+      versions:
+        - 7
+        - 8
+    - name: Ubuntu
+      versions:
+        - 18.04
+        - 20.04
+        - 22.04
+  galaxy_tags:
+    - system
+    - configuration
+    - common

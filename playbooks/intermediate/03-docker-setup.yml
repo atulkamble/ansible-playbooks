@@ -1,0 +1,135 @@
+---
+# Intermediate Playbook 3: Docker Installation and Configuration
+- name: Install and Configure Docker
+  hosts: all
+  become: true
+
+  vars:
+    docker_users:
+      - ec2-user
+      - devuser
+    
+    docker_containers:
+      - name: nginx-web
+        image: nginx:latest
+        ports:
+          - "8080:80"
+        state: started
+      - name: redis-cache
+        image: redis:alpine
+        ports:
+          - "6379:6379"
+        state: started
+
+  tasks:
+    - name: Install required packages for Docker
+      yum:
+        name:
+          - yum-utils
+          - device-mapper-persistent-data
+          - lvm2
+        state: present
+      when: ansible_os_family == "RedHat"
+
+    - name: Add Docker repository (RedHat)
+      command: yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
+      args:
+        creates: /etc/yum.repos.d/docker-ce.repo
+      when: ansible_os_family == "RedHat"
+
+    - name: Install Docker
+      yum:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+        state: present
+      when: ansible_os_family == "RedHat"
+
+    - name: Install Docker (Debian/Ubuntu)
+      apt:
+        name:
+          - docker.io
+          - docker-compose
+        state: present
+        update_cache: yes
+      when: ansible_os_family == "Debian"
+
+    - name: Create Docker daemon configuration
+      copy:
+        content: |
+          {
+            "log-driver": "json-file",
+            "log-opts": {
+              "max-size": "10m",
+              "max-file": "3"
+            },
+            "storage-driver": "overlay2",
+            "live-restore": true
+          }
+        dest: /etc/docker/daemon.json
+        owner: root
+        group: root
+        mode: '0644'
+      notify: restart docker
+
+    - name: Start and enable Docker service
+      service:
+        name: docker
+        state: started
+        enabled: yes
+
+    - name: Add users to docker group
+      user:
+        name: "{{ item }}"
+        groups: docker
+        append: yes
+      loop: "{{ docker_users }}"
+      ignore_errors: yes
+
+    - name: Install Docker Python library
+      pip:
+        name: docker
+        state: present
+      ignore_errors: yes
+
+    - name: Pull Docker images
+      docker_image:
+        name: "{{ item.image }}"
+        source: pull
+      loop: "{{ docker_containers }}"
+      ignore_errors: yes
+
+    - name: Start Docker containers
+      docker_container:
+        name: "{{ item.name }}"
+        image: "{{ item.image }}"
+        ports: "{{ item.ports }}"
+        state: "{{ item.state }}"
+        restart_policy: unless-stopped
+      loop: "{{ docker_containers }}"
+      ignore_errors: yes
+
+    - name: Verify Docker is running
+      command: docker --version
+      register: docker_version
+      changed_when: false
+
+    - name: Display Docker version
+      debug:
+        msg: "{{ docker_version.stdout }}"
+
+    - name: List running containers
+      command: docker ps
+      register: running_containers
+      changed_when: false
+
+    - name: Display running containers
+      debug:
+        var: running_containers.stdout_lines
+
+  handlers:
+    - name: restart docker
+      service:
+        name: docker
+        state: restarted

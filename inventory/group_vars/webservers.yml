@@ -1,0 +1,10 @@
+---
+# Web server specific variables
+http_port: 80
+https_port: 443
+document_root: /var/www/html
+server_admin: admin@example.com
+
+# Apache/Nginx configuration
+max_clients: 256
+keepalive_timeout: 65

@@ -1,0 +1,49 @@
+---
+# Basic Playbook 4: Service Management
+- name: Manage System Services
+  hosts: all
+  become: true
+
+  tasks:
+    - name: Install chronyd (time synchronization)
+      package:
+        name: chrony
+        state: present
+
+    - name: Configure chronyd
+      copy:
+        content: |
+          server 0.pool.ntp.org iburst
+          server 1.pool.ntp.org iburst
+          server 2.pool.ntp.org iburst
+          server 3.pool.ntp.org iburst
+          driftfile /var/lib/chrony/drift
+          makestep 1.0 3
+          rtcsync
+        dest: /etc/chrony.conf
+        owner: root
+        group: root
+        mode: '0644'
+      notify: restart chronyd
+
+    - name: Start and enable chronyd
+      service:
+        name: chronyd
+        state: started
+        enabled: yes
+
+    - name: Check service status
+      command: systemctl is-active chronyd
+      register: service_status
+      changed_when: false
+      failed_when: false
+
+    - name: Display service status
+      debug:
+        msg: "Chronyd service is {{ service_status.stdout }}"
+
+  handlers:
+    - name: restart chronyd
+      service:
+        name: chronyd
+        state: restarted

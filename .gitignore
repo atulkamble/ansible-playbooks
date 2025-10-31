@@ -1,0 +1,74 @@
+# Ansible Project .gitignore
+
+# Ansible retry files
+*.retry
+
+# Ansible vault password files
+*vault*.txt
+*vault*.yml
+.vault_pass*
+
+# Python
+*.pyc
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+ENV/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+.cache/
+
+# Backup files
+*.backup
+*.bak
+*~
+
+# Sensitive data
+secrets/
+credentials/
+*.pem
+*.key
+!*.pub
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Ansible facts cache
+/tmp/ansible_facts/
+fact_cache/
+
+# Collections
+collections/
+
+# Local inventory files (if you have machine-specific ones)
+inventory/local/
+inventory/*.local
+
+# Test outputs
+test-results/
+.pytest_cache/

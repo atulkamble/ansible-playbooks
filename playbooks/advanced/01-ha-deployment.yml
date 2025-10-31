@@ -1,0 +1,145 @@
+---
+# Advanced Playbook 1: High Availability Web Application Stack
+- name: Deploy HA Web Application Stack
+  hosts: all
+  become: true
+  serial: 1
+
+  vars:
+    app_version: "1.0.0"
+    health_check_url: "http://localhost/health"
+    deployment_strategy: rolling
+    rollback_on_failure: true
+
+  pre_tasks:
+    - name: Gather facts from all hosts
+      setup:
+      delegate_to: "{{ item }}"
+      delegate_facts: true
+      loop: "{{ groups['all'] }}"
+
+    - name: Verify prerequisites
+      assert:
+        that:
+          - ansible_memtotal_mb >= 1024
+          - ansible_processor_vcpus >= 2
+        fail_msg: "System does not meet minimum requirements"
+        success_msg: "Prerequisites verified"
+
+  tasks:
+    - name: Create deployment marker
+      copy:
+        content: |
+          Deployment started: {{ ansible_date_time.iso8601 }}
+          Version: {{ app_version }}
+          Host: {{ ansible_hostname }}
+        dest: /var/log/deployment-{{ ansible_date_time.epoch }}.log
+        owner: root
+        group: root
+        mode: '0644'
+
+    - block:
+        - name: Stop application service
+          service:
+            name: myapp
+            state: stopped
+          ignore_errors: yes
+
+        - name: Backup current application
+          archive:
+            path: /opt/myapp
+            dest: /var/backups/myapp-{{ ansible_date_time.epoch }}.tar.gz
+            format: gz
+          ignore_errors: yes
+
+        - name: Deploy new application version
+          copy:
+            content: |
+              #!/bin/bash
+              echo "Application version {{ app_version }}"
+              echo "Running on {{ ansible_hostname }}"
+            dest: /opt/myapp/app.sh
+            owner: root
+            group: root
+            mode: '0755'
+
+        - name: Update application configuration
+          template:
+            src: templates/app-config.j2
+            dest: /opt/myapp/config/app.yml
+            owner: root
+            group: root
+            mode: '0644'
+          ignore_errors: yes
+
+        - name: Start application service
+          service:
+            name: myapp
+            state: started
+          ignore_errors: yes
+
+        - name: Wait for application to be ready
+          uri:
+            url: "{{ health_check_url }}"
+            status_code: 200
+          register: health_check
+          until: health_check.status == 200
+          retries: 10
+          delay: 5
+          ignore_errors: yes
+
+        - name: Verify deployment
+          command: /opt/myapp/app.sh
+          register: app_output
+          changed_when: false
+          failed_when: app_version not in app_output.stdout
+          ignore_errors: yes
+
+      rescue:
+        - name: Deployment failed - initiating rollback
+          debug:
+            msg: "Deployment failed on {{ ansible_hostname }}, initiating rollback"
+
+        - name: Restore from backup
+          unarchive:
+            src: /var/backups/myapp-{{ ansible_date_time.epoch }}.tar.gz
+            dest: /opt/
+            remote_src: yes
+          when: rollback_on_failure
+          ignore_errors: yes
+
+        - name: Restart application after rollback
+          service:
+            name: myapp
+            state: restarted
+          when: rollback_on_failure
+          ignore_errors: yes
+
+        - name: Fail the playbook
+          fail:
+            msg: "Deployment failed and rollback completed"
+
+  post_tasks:
+    - name: Update deployment status
+      lineinfile:
+        path: /var/log/deployment-{{ ansible_date_time.epoch }}.log
+        line: "Deployment completed: {{ ansible_date_time.iso8601 }}"
+        create: yes
+
+    - name: Send deployment notification
+      debug:
+        msg: "Deployment of version {{ app_version }} completed on {{ ansible_hostname }}"
+
+    - name: Clean old backups
+      find:
+        paths: /var/backups
+        patterns: "myapp-*.tar.gz"
+        age: 7d
+      register: old_backups
+
+    - name: Remove old backups
+      file:
+        path: "{{ item.path }}"
+        state: absent
+      loop: "{{ old_backups.files }}"
+      when: old_backups.files | length > 5

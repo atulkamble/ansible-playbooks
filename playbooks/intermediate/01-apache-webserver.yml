@@ -1,0 +1,159 @@
+---
+# Intermediate Playbook 1: Apache Web Server with SSL
+- name: Deploy Apache Web Server with SSL
+  hosts: webservers
+  become: true
+
+  vars:
+    domain_name: example.com
+    ssl_cert_path: /etc/ssl/certs
+    ssl_key_path: /etc/ssl/private
+
+  tasks:
+    - name: Install Apache and dependencies
+      yum:
+        name:
+          - httpd
+          - mod_ssl
+          - openssl
+        state: present
+      when: ansible_os_family == "RedHat"
+
+    - name: Install Apache (Debian/Ubuntu)
+      apt:
+        name:
+          - apache2
+          - ssl-cert
+        state: present
+      when: ansible_os_family == "Debian"
+
+    - name: Create document root
+      file:
+        path: "{{ document_root }}"
+        state: directory
+        owner: apache
+        group: apache
+        mode: '0755'
+      when: ansible_os_family == "RedHat"
+
+    - name: Deploy website content
+      copy:
+        content: |
+          <!DOCTYPE html>
+          <html>
+          <head>
+              <title>Welcome to {{ domain_name }}</title>
+              <style>
+                  body { font-family: Arial, sans-serif; text-align: center; margin-top: 50px; }
+                  h1 { color: #333; }
+              </style>
+          </head>
+          <body>
+              <h1>Welcome to {{ domain_name }}</h1>
+              <p>This server is managed by Ansible</p>
+              <p>Server: {{ ansible_hostname }}</p>
+          </body>
+          </html>
+        dest: "{{ document_root }}/index.html"
+        owner: apache
+        group: apache
+        mode: '0644'
+      when: ansible_os_family == "RedHat"
+
+    - name: Configure Apache virtual host
+      copy:
+        content: |
+          <VirtualHost *:80>
+              ServerName {{ domain_name }}
+              ServerAdmin {{ server_admin }}
+              DocumentRoot {{ document_root }}
+              
+              <Directory {{ document_root }}>
+                  Options Indexes FollowSymLinks
+                  AllowOverride All
+                  Require all granted
+              </Directory>
+              
+              ErrorLog /var/log/httpd/{{ domain_name }}-error.log
+              CustomLog /var/log/httpd/{{ domain_name }}-access.log combined
+          </VirtualHost>
+        dest: /etc/httpd/conf.d/{{ domain_name }}.conf
+        owner: root
+        group: root
+        mode: '0644'
+      when: ansible_os_family == "RedHat"
+      notify: restart apache
+
+    - name: Generate self-signed SSL certificate
+      command: >
+        openssl req -new -newkey rsa:2048 -days 365 -nodes -x509
+        -subj "/C=US/ST=State/L=City/O=Organization/CN={{ domain_name }}"
+        -keyout {{ ssl_key_path }}/{{ domain_name }}.key
+        -out {{ ssl_cert_path }}/{{ domain_name }}.crt
+      args:
+        creates: "{{ ssl_cert_path }}/{{ domain_name }}.crt"
+
+    - name: Configure SSL virtual host
+      copy:
+        content: |
+          <VirtualHost *:443>
+              ServerName {{ domain_name }}
+              ServerAdmin {{ server_admin }}
+              DocumentRoot {{ document_root }}
+              
+              SSLEngine on
+              SSLCertificateFile {{ ssl_cert_path }}/{{ domain_name }}.crt
+              SSLCertificateKeyFile {{ ssl_key_path }}/{{ domain_name }}.key
+              
+              <Directory {{ document_root }}>
+                  Options Indexes FollowSymLinks
+                  AllowOverride All
+                  Require all granted
+              </Directory>
+              
+              ErrorLog /var/log/httpd/{{ domain_name }}-ssl-error.log
+              CustomLog /var/log/httpd/{{ domain_name }}-ssl-access.log combined
+          </VirtualHost>
+        dest: /etc/httpd/conf.d/{{ domain_name }}-ssl.conf
+        owner: root
+        group: root
+        mode: '0644'
+      when: ansible_os_family == "RedHat"
+      notify: restart apache
+
+    - name: Configure firewall for HTTP/HTTPS
+      firewalld:
+        service: "{{ item }}"
+        permanent: yes
+        state: enabled
+        immediate: yes
+      loop:
+        - http
+        - https
+      when: ansible_os_family == "RedHat"
+      ignore_errors: yes
+
+    - name: Start and enable Apache
+      service:
+        name: httpd
+        state: started
+        enabled: yes
+      when: ansible_os_family == "RedHat"
+
+    - name: Verify Apache is running
+      uri:
+        url: http://{{ ansible_default_ipv4.address }}
+        status_code: 200
+      register: apache_check
+      ignore_errors: yes
+
+    - name: Display Apache status
+      debug:
+        msg: "Apache is {{ 'running' if apache_check.status == 200 else 'not responding' }}"
+
+  handlers:
+    - name: restart apache
+      service:
+        name: httpd
+        state: restarted
+      when: ansible_os_family == "RedHat"

@@ -1,0 +1,172 @@
+---
+# Intermediate Playbook 2: MySQL Database Setup
+- name: Deploy and Configure MySQL Database
+  hosts: databases
+  become: true
+
+  vars:
+    mysql_root_password: "ChangeMe123!"
+    databases:
+      - name: webapp_db
+        encoding: utf8mb4
+        collation: utf8mb4_unicode_ci
+      - name: analytics_db
+        encoding: utf8mb4
+        collation: utf8mb4_unicode_ci
+    
+    mysql_users:
+      - name: webapp_user
+        password: "WebApp123!"
+        priv: "webapp_db.*:ALL"
+        host: "%"
+      - name: analytics_user
+        password: "Analytics123!"
+        priv: "analytics_db.*:SELECT,INSERT,UPDATE"
+        host: "192.168.1.%"
+
+  tasks:
+    - name: Install MySQL/MariaDB
+      yum:
+        name:
+          - mariadb-server
+          - mariadb
+          - MySQL-python
+        state: present
+      when: ansible_os_family == "RedHat"
+
+    - name: Install MySQL (Debian/Ubuntu)
+      apt:
+        name:
+          - mysql-server
+          - python3-pymysql
+        state: present
+      when: ansible_os_family == "Debian"
+
+    - name: Start and enable MySQL service
+      service:
+        name: mariadb
+        state: started
+        enabled: yes
+      when: ansible_os_family == "RedHat"
+
+    - name: Create MySQL configuration file
+      copy:
+        content: |
+          [mysqld]
+          bind-address = 0.0.0.0
+          port = {{ mysql_port }}
+          max_connections = {{ mysql_max_connections }}
+          innodb_buffer_pool_size = {{ mysql_innodb_buffer_pool_size }}
+          character-set-server = utf8mb4
+          collation-server = utf8mb4_unicode_ci
+          
+          # Binary logging
+          log-bin = /var/log/mysql/mysql-bin.log
+          expire_logs_days = 7
+          
+          # Slow query log
+          slow_query_log = 1
+          slow_query_log_file = /var/log/mysql/slow-query.log
+          long_query_time = 2
+          
+          # Error log
+          log-error = /var/log/mysql/error.log
+        dest: /etc/my.cnf.d/server.cnf
+        owner: root
+        group: root
+        mode: '0644'
+      when: ansible_os_family == "RedHat"
+      notify: restart mysql
+
+    - name: Secure MySQL installation
+      mysql_user:
+        name: root
+        password: "{{ mysql_root_password }}"
+        host: localhost
+        login_unix_socket: /var/lib/mysql/mysql.sock
+      ignore_errors: yes
+
+    - name: Remove anonymous MySQL users
+      mysql_user:
+        name: ''
+        host_all: yes
+        state: absent
+        login_user: root
+        login_password: "{{ mysql_root_password }}"
+      ignore_errors: yes
+
+    - name: Remove MySQL test database
+      mysql_db:
+        name: test
+        state: absent
+        login_user: root
+        login_password: "{{ mysql_root_password }}"
+      ignore_errors: yes
+
+    - name: Create application databases
+      mysql_db:
+        name: "{{ item.name }}"
+        encoding: "{{ item.encoding }}"
+        collation: "{{ item.collation }}"
+        state: present
+        login_user: root
+        login_password: "{{ mysql_root_password }}"
+      loop: "{{ databases }}"
+
+    - name: Create MySQL users
+      mysql_user:
+        name: "{{ item.name }}"
+        password: "{{ item.password }}"
+        priv: "{{ item.priv }}"
+        host: "{{ item.host }}"
+        state: present
+        login_user: root
+        login_password: "{{ mysql_root_password }}"
+      loop: "{{ mysql_users }}"
+
+    - name: Create backup directory
+      file:
+        path: "{{ backup_dir }}"
+        state: directory
+        owner: mysql
+        group: mysql
+        mode: '0750'
+
+    - name: Create backup script
+      copy:
+        content: |
+          #!/bin/bash
+          BACKUP_DIR="{{ backup_dir }}"
+          DATE=$(date +%Y%m%d_%H%M%S)
+          RETENTION_DAYS={{ backup_retention_days }}
+          
+          # Backup all databases
+          mysqldump -u root -p{{ mysql_root_password }} --all-databases > ${BACKUP_DIR}/full_backup_${DATE}.sql
+          
+          # Compress backup
+          gzip ${BACKUP_DIR}/full_backup_${DATE}.sql
+          
+          # Remove old backups
+          find ${BACKUP_DIR} -name "full_backup_*.sql.gz" -mtime +${RETENTION_DAYS} -delete
+          
+          echo "Backup completed: full_backup_${DATE}.sql.gz"
+        dest: /usr/local/bin/mysql_backup.sh
+        owner: root
+        group: root
+        mode: '0750'
+
+    - name: Configure firewall for MySQL
+      firewalld:
+        port: "{{ mysql_port }}/tcp"
+        permanent: yes
+        state: enabled
+        immediate: yes
+      when: ansible_os_family == "RedHat"
+      ignore_errors: yes
+
+  handlers:
+    - name: restart mysql
+      service:
+        name: mariadb
+        state: restarted
+      when: ansible_os_family == "RedHat"

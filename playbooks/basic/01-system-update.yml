@@ -1,0 +1,41 @@
+---
+# Basic Playbook 1: System Update and Common Packages
+- name: Basic System Setup
+  hosts: all
+  become: true
+  gather_facts: true
+
+  tasks:
+    - name: Update all packages (yum)
+      yum:
+        name: '*'
+        state: latest
+        update_cache: yes
+      when: ansible_os_family == "RedHat"
+
+    - name: Update all packages (apt)
+      apt:
+        upgrade: dist
+        update_cache: yes
+        cache_valid_time: 3600
+      when: ansible_os_family == "Debian"
+
+    - name: Install common packages
+      package:
+        name: "{{ common_packages }}"
+        state: present
+
+    - name: Ensure vim is the default editor
+      alternatives:
+        name: editor
+        path: /usr/bin/vim.basic
+      when: ansible_os_family == "Debian"
+      ignore_errors: yes
+
+    - name: Display system information
+      debug:
+        msg: |
+          Hostname: {{ ansible_hostname }}
+          OS: {{ ansible_distribution }} {{ ansible_distribution_version }}
+          Kernel: {{ ansible_kernel }}
+          Architecture: {{ ansible_architecture }}

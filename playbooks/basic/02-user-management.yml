@@ -1,0 +1,46 @@
+---
+# Basic Playbook 2: User Management
+- name: Manage Users and Groups
+  hosts: all
+  become: true
+
+  vars:
+    users_to_create:
+      - name: devuser
+        groups: wheel
+        shell: /bin/bash
+      - name: appuser
+        groups: users
+        shell: /bin/bash
+
+  tasks:
+    - name: Create user groups
+      group:
+        name: developers
+        state: present
+
+    - name: Create users
+      user:
+        name: "{{ item.name }}"
+        groups: "{{ item.groups }}"
+        shell: "{{ item.shell }}"
+        state: present
+        create_home: yes
+      loop: "{{ users_to_create }}"
+
+    - name: Set up SSH directory for users
+      file:
+        path: "/home/{{ item.name }}/.ssh"
+        state: directory
+        owner: "{{ item.name }}"
+        group: "{{ item.name }}"
+        mode: '0700'
+      loop: "{{ users_to_create }}"
+
+    - name: Add authorized keys
+      authorized_key:
+        user: "{{ item.name }}"
+        state: present
+        key: "{{ lookup('file', '~/.ssh/id_rsa.pub') }}"
+      loop: "{{ users_to_create }}"
+      ignore_errors: yes

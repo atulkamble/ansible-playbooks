@@ -1,0 +1,23 @@
+---
+# Sample Configuration File
+# Application: {{ APP_NAME | default('MyApp') }}
+# Version: {{ APP_VERSION | default('1.0.0') }}
+# Environment: {{ APP_ENV | default('production') }}
+
+[server]
+host = {{ ansible_default_ipv4.address }}
+port = 8080
+workers = {{ ansible_processor_vcpus }}
+
+[database]
+host = localhost
+port = 3306
+name = myapp_db
+
+[logging]
+level = {{ LOG_LEVEL | default('info') }}
+file = /var/log/myapp/app.log
+
+[cache]
+enabled = true
+ttl = 3600

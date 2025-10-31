@@ -1,0 +1,178 @@
+---
+# Intermediate Playbook 4: Security Hardening
+- name: System Security Hardening
+  hosts: all
+  become: true
+
+  vars:
+    ssh_port: 22
+    allowed_ssh_users:
+      - ec2-user
+      - ansible
+    
+    firewall_allowed_ports:
+      - 22/tcp
+      - 80/tcp
+      - 443/tcp
+
+  tasks:
+    - name: Update SSH configuration for security
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: "{{ item.regexp }}"
+        line: "{{ item.line }}"
+        state: present
+        backup: yes
+      loop:
+        - { regexp: '^#?PermitRootLogin', line: 'PermitRootLogin no' }
+        - { regexp: '^#?PasswordAuthentication', line: 'PasswordAuthentication no' }
+        - { regexp: '^#?PubkeyAuthentication', line: 'PubkeyAuthentication yes' }
+        - { regexp: '^#?X11Forwarding', line: 'X11Forwarding no' }
+        - { regexp: '^#?MaxAuthTries', line: 'MaxAuthTries 3' }
+        - { regexp: '^#?ClientAliveInterval', line: 'ClientAliveInterval 300' }
+        - { regexp: '^#?ClientAliveCountMax', line: 'ClientAliveCountMax 2' }
+        - { regexp: '^#?Protocol', line: 'Protocol 2' }
+      notify: restart sshd
+
+    - name: Restrict SSH access to specific users
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        line: "AllowUsers {{ allowed_ssh_users | join(' ') }}"
+        state: present
+      notify: restart sshd
+
+    - name: Install and configure fail2ban
+      yum:
+        name: fail2ban
+        state: present
+      when: ansible_os_family == "RedHat"
+
+    - name: Configure fail2ban for SSH
+      copy:
+        content: |
+          [DEFAULT]
+          bantime = 3600
+          findtime = 600
+          maxretry = 5
+          
+          [sshd]
+          enabled = true
+          port = {{ ssh_port }}
+          logpath = /var/log/secure
+          backend = systemd
+        dest: /etc/fail2ban/jail.local
+        owner: root
+        group: root
+        mode: '0644'
+      notify: restart fail2ban
+
+    - name: Start and enable fail2ban
+      service:
+        name: fail2ban
+        state: started
+        enabled: yes
+      when: ansible_os_family == "RedHat"
+
+    - name: Install firewalld
+      yum:
+        name: firewalld
+        state: present
+      when: ansible_os_family == "RedHat"
+
+    - name: Start and enable firewalld
+      service:
+        name: firewalld
+        state: started
+        enabled: yes
+      when: ansible_os_family == "RedHat"
+
+    - name: Configure firewall rules
+      firewalld:
+        port: "{{ item }}"
+        permanent: yes
+        state: enabled
+        immediate: yes
+      loop: "{{ firewall_allowed_ports }}"
+      when: ansible_os_family == "RedHat"
+
+    - name: Set firewall default zone to drop
+      command: firewall-cmd --set-default-zone=drop
+      when: ansible_os_family == "RedHat"
+      ignore_errors: yes
+
+    - name: Disable unnecessary services
+      service:
+        name: "{{ item }}"
+        state: stopped
+        enabled: no
+      loop:
+        - postfix
+        - cups
+      ignore_errors: yes
+
+    - name: Set secure permissions on critical files
+      file:
+        path: "{{ item }}"
+        owner: root
+        group: root
+        mode: '0600'
+      loop:
+        - /etc/ssh/sshd_config
+        - /etc/passwd
+        - /etc/shadow
+        - /etc/group
+        - /etc/gshadow
+      ignore_errors: yes
+
+    - name: Configure kernel security parameters
+      sysctl:
+        name: "{{ item.name }}"
+        value: "{{ item.value }}"
+        state: present
+        reload: yes
+      loop:
+        - { name: 'net.ipv4.conf.all.accept_source_route', value: '0' }
+        - { name: 'net.ipv4.conf.all.accept_redirects', value: '0' }
+        - { name: 'net.ipv4.conf.all.secure_redirects', value: '0' }
+        - { name: 'net.ipv4.conf.all.send_redirects', value: '0' }
+        - { name: 'net.ipv4.icmp_echo_ignore_broadcasts', value: '1' }
+        - { name: 'net.ipv4.icmp_ignore_bogus_error_responses', value: '1' }
+        - { name: 'net.ipv4.tcp_syncookies', value: '1' }
+        - { name: 'kernel.randomize_va_space', value: '2' }
+
+    - name: Install security updates automatically
+      yum:
+        name: yum-cron
+        state: present
+      when: ansible_os_family == "RedHat"
+
+    - name: Configure automatic security updates
+      lineinfile:
+        path: /etc/yum/yum-cron.conf
+        regexp: '^update_cmd'
+        line: 'update_cmd = security'
+      when: ansible_os_family == "RedHat"
+      notify: restart yum-cron
+
+    - name: Start and enable yum-cron
+      service:
+        name: yum-cron
+        state: started
+        enabled: yes
+      when: ansible_os_family == "RedHat"
+
+  handlers:
+    - name: restart sshd
+      service:
+        name: sshd
+        state: restarted
+
+    - name: restart fail2ban
+      service:
+        name: fail2ban
+        state: restarted
+
+    - name: restart yum-cron
+      service:
+        name: yum-cron
+        state: restarted

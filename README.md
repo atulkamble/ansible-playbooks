@@ -1,53 +1,93 @@
-**starter collection of Ansible Playbook templates for Amazon Linux hosts**, covering common scenarios like **package installation, service management, file configuration, and EC2-specific tasks**.
+# Ansible Playbooks Collection
 
----
+A comprehensive collection of Ansible playbooks ranging from basic to advanced configurations for infrastructure automation.
 
-## 1. **Basic Setup: Update & Install Packages**
+## 📁 Repository Structure
 
-```yaml
----
-- name: Basic setup for Amazon Linux
-  hosts: all
-  become: true
-
-  tasks:
-    - name: Update all packages
-      yum:
-        name: '*'
-        state: latest
-
-    - name: Install essential packages
-      yum:
-        name:
-          - git
-          - wget
-          - unzip
-          - tree
-        state: present
 ```
+ansible-playbooks/
+├── ansible.cfg                 # Ansible configuration
+├── inventory/                  # Inventory files
+│   ├── hosts                  # Main inventory
+│   └── group_vars/            # Group variables
+│       ├── all.yml
+│       ├── webservers.yml
+│       └── databases.yml
+├── playbooks/                 # Playbook collection
+│   ├── basic/                 # Basic playbooks
+│   ├── intermediate/          # Intermediate playbooks
+│   └── advanced/              # Advanced playbooks
+├── roles/                     # Ansible roles
+│   └── common/
+├── templates/                 # Jinja2 templates
+├── files/                     # Static files
+└── scripts/                   # Utility scripts
+    ├── validate-playbooks.sh  # Validation script
+    ├── run-playbook.sh        # Playbook runner
+    └── list-playbooks.sh      # List all playbooks
 ```
-sudo ansible-playbook -i inventory/hosts playbooks/update.yml
+
+## 🚀 Quick Start
+
+### Prerequisites
+
+- Ansible 2.9 or higher
+- Python 3.6 or higher
+- SSH access to target hosts
+
+### Installation
+
+1. **Clone the repository:**
+```bash
+git clone https://github.com/yourusername/ansible-playbooks.git
+cd ansible-playbooks
 ```
----
 
-## 2. **Apache Web Server Deployment**
+2. **Install Ansible:**
+```bash
+# macOS
+brew install ansible
 
-```yaml
----
-- name: Install and configure Apache on Amazon Linux
-  hosts: web
-  become: true
+# Ubuntu/Debian
+sudo apt update
+sudo apt install ansible
 
-  tasks:
-    - name: Install Apache (httpd)
-      yum:
-        name: httpd
-        state: present
+# RHEL/CentOS
+sudo yum install ansible
 
-    - name: Start and enable Apache service
-      systemd:
-        name: httpd
-        state: started
+# Using pip
+pip install ansible
+```
+
+3. **Install ansible-lint (optional but recommended):**
+```bash
+pip install ansible-lint
+```
+
+4. **Make scripts executable:**
+```bash
+chmod +x scripts/*.sh
+```
+
+### Configuration
+
+1. **Update inventory file:**
+Edit `inventory/hosts` with your server details:
+```ini
+[webservers]
+web1 ansible_host=192.168.1.10
+web2 ansible_host=192.168.1.11
+
+[databases]
+db1 ansible_host=192.168.1.20
+```
+
+2. **Update group variables:**
+Edit files in `inventory/group_vars/` as needed.
+
+3. **Configure SSH access:**
+```bash
+ssh-copy-id user@your-server
         enabled: true
 
     - name: Deploy index.html

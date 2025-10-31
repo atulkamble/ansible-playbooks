@@ -1,0 +1,27 @@
+---
+# Common role tasks
+- name: Update package cache (RedHat)
+  yum:
+    update_cache: yes
+  when: ansible_os_family == "RedHat"
+
+- name: Update package cache (Debian)
+  apt:
+    update_cache: yes
+  when: ansible_os_family == "Debian"
+
+- name: Install common packages
+  package:
+    name: "{{ common_packages }}"
+    state: present
+
+- name: Set timezone
+  timezone:
+    name: "{{ timezone }}"
+  when: timezone is defined
+
+- name: Ensure chrony is installed
+  package:
+    name: chrony
+    state: present
+  when: ntp_enabled | bool
