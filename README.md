@@ -406,4 +406,237 @@ ec2-54-123-45-67.compute-1.amazonaws.com ansible_user=ec2-user ansible_ssh_priva
 ansible-playbook -i hosts playbook.yml
 ```
 
+Here’s a **collection of basic Ansible YAML playbooks** that you can directly use for learning, practice, or automation labs 👇
+
+---
+
+## 🧩 **1. Basic Ping Playbook**
+
+Checks connectivity to managed nodes.
+
+```yaml
+---
+- name: Ping all hosts
+  hosts: all
+  tasks:
+    - name: Test connectivity
+      ansible.builtin.ping:
+```
+
+---
+
+## ⚙️ **2. Install a Package**
+
+Installs Apache (httpd) on RedHat-based systems.
+
+```yaml
+---
+- name: Install Apache Web Server
+  hosts: webservers
+  become: yes
+  tasks:
+    - name: Install httpd
+      ansible.builtin.yum:
+        name: httpd
+        state: present
+```
+
+---
+
+## 🧰 **3. Start & Enable Service**
+
+```yaml
+---
+- name: Ensure Apache is started and enabled
+  hosts: webservers
+  become: yes
+  tasks:
+    - name: Start and enable httpd
+      ansible.builtin.service:
+        name: httpd
+        state: started
+        enabled: yes
+```
+
+---
+
+## 📄 **4. Copy a File to Remote Server**
+
+```yaml
+---
+- name: Copy index.html to webservers
+  hosts: webservers
+  become: yes
+  tasks:
+    - name: Copy file
+      ansible.builtin.copy:
+        src: files/index.html
+        dest: /var/www/html/index.html
+        owner: root
+        group: root
+        mode: '0644'
+```
+
+---
+
+## 🔧 **5. Create a User**
+
+```yaml
+---
+- name: Create a new user
+  hosts: all
+  become: yes
+  tasks:
+    - name: Add devops user
+      ansible.builtin.user:
+        name: devops
+        state: present
+        groups: wheel
+```
+
+---
+
+## 🧹 **6. Remove a Package**
+
+```yaml
+---
+- name: Remove Apache Web Server
+  hosts: webservers
+  become: yes
+  tasks:
+    - name: Remove httpd
+      ansible.builtin.yum:
+        name: httpd
+        state: absent
+```
+
+---
+
+## 🧾 **7. Gather Facts**
+
+```yaml
+---
+- name: Display system facts
+  hosts: all
+  tasks:
+    - name: Print OS details
+      ansible.builtin.debug:
+        var: ansible_facts['os_family']
+```
+
+---
+
+## 🔄 **8. Restart Service**
+
+```yaml
+---
+- name: Restart Apache
+  hosts: webservers
+  become: yes
+  tasks:
+    - name: Restart httpd
+      ansible.builtin.service:
+        name: httpd
+        state: restarted
+```
+
+---
+
+## 🌐 **9. Deploy Simple Web Page**
+
+Combines multiple tasks (install, copy, start service).
+
+```yaml
+---
+- name: Deploy a simple web page
+  hosts: webservers
+  become: yes
+  tasks:
+    - name: Install Apache
+      ansible.builtin.yum:
+        name: httpd
+        state: present
+
+    - name: Copy index file
+      ansible.builtin.copy:
+        src: files/index.html
+        dest: /var/www/html/index.html
+
+    - name: Start and enable service
+      ansible.builtin.service:
+        name: httpd
+        state: started
+        enabled: yes
+```
+
+---
+
+## 🗂 **10. Template Example**
+
+Using Jinja2 template for dynamic content.
+
+```yaml
+---
+- name: Deploy a template file
+  hosts: webservers
+  become: yes
+  tasks:
+    - name: Copy template
+      ansible.builtin.template:
+        src: templates/index.j2
+        dest: /var/www/html/index.html
+```
+
+**Example template (`templates/index.j2`):**
+
+```jinja2
+<html>
+  <body>
+    <h1>Welcome to {{ ansible_hostname }}</h1>
+    <p>Server IP: {{ ansible_default_ipv4.address }}</p>
+  </body>
+</html>
+```
+
+---
+
+## 📦 **11. Install Multiple Packages**
+
+```yaml
+---
+- name: Install multiple packages
+  hosts: all
+  become: yes
+  tasks:
+    - name: Install git, tree, and curl
+      ansible.builtin.yum:
+        name:
+          - git
+          - tree
+          - curl
+        state: present
+```
+
+---
+
+## 🧮 **12. Use Variables**
+
+```yaml
+---
+- name: Install package using variables
+  hosts: all
+  become: yes
+  vars:
+    pkg_name: httpd
+  tasks:
+    - name: Install {{ pkg_name }}
+      ansible.builtin.yum:
+        name: "{{ pkg_name }}"
+        state: present
+```
+
+---
+
+Would you like me to create a **GitHub-ready structure** (with `inventory`, `files/`, `templates/`, and `site.yml`) containing these 10+ playbooks as examples for your students or project repo (e.g., `ansible-basic-lab`)?
+
 ---
