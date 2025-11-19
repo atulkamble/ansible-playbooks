@@ -1,154 +1,458 @@
-# Ansible Playbooks Collection
+# 🚀 **ANSIBLE PLAYBOOKS — COMPLETE & ORGANIZED**
 
-A comprehensive collection of Ansible playbooks ranging from basic to advanced configurations for infrastructure automation.
-
-## 📁 Repository Structure
-
-```
-ansible-playbooks/
-├── ansible.cfg                 # Ansible configuration
-├── inventory/                  # Inventory files
-│   ├── hosts                  # Main inventory
-│   └── group_vars/            # Group variables
-│       ├── all.yml
-│       ├── webservers.yml
-│       └── databases.yml
-├── playbooks/                 # Playbook collection
-│   ├── basic/                 # Basic playbooks
-│   ├── intermediate/          # Intermediate playbooks
-│   └── advanced/              # Advanced playbooks
-├── roles/                     # Ansible roles
-│   └── common/
-├── templates/                 # Jinja2 templates
-├── files/                     # Static files
-└── scripts/                   # Utility scripts
-    ├── validate-playbooks.sh  # Validation script
-    ├── run-playbook.sh        # Playbook runner
-    └── list-playbooks.sh      # List all playbooks
-```
-
-## 🚀 Quick Start
-
-### Prerequisites
-
-- Ansible 2.9 or higher
-- Python 3.6 or higher
-- SSH access to target hosts
-
-### Installation
-
-1. **Clone the repository:**
-```bash
-git clone https://github.com/yourusername/ansible-playbooks.git
-cd ansible-playbooks
-```
-
-2. **Install Ansible:**
-```bash
-# macOS
-brew install ansible
-
-# Ubuntu/Debian
-sudo apt update
-sudo apt install ansible
-
-# RHEL/CentOS
-sudo yum install ansible
-
-# Using pip
-pip install ansible
-```
-
-3. **Install ansible-lint (optional but recommended):**
-```bash
-pip install ansible-lint
-```
-
-4. **Make scripts executable:**
-```bash
-chmod +x scripts/*.sh
-```
-
-### Configuration
-
-1. **Update inventory file:**
-Edit `inventory/hosts` with your server details:
-```ini
-[webservers]
-web1 ansible_host=192.168.1.10
-web2 ansible_host=192.168.1.11
-
-[databases]
-db1 ansible_host=192.168.1.20
-```
-
-2. **Update group variables:**
-Edit files in `inventory/group_vars/` as needed.
-
-3. **Configure SSH access:**
-```bash
-ssh-copy-id user@your-server
-        enabled: true
-
-    - name: Deploy index.html
-      copy:
-        content: "<h1>Hello from Ansible on Amazon Linux</h1>"
-        dest: /var/www/html/index.html
-        mode: '0644'
-```
+**Basic → Intermediate → Advanced (AWS, Linux, Docker, Security, Kubernetes)**
 
 ---
 
-## 3. **EC2-Specific: Add SSH Key to EC2 User**
+# 1️⃣ **BASIC PLAYBOOKS (1–20)**
+
+Fundamental operations, ideal for beginners.
+
+---
+
+## **1. Ping All Hosts**
 
 ```yaml
----
-- name: Add SSH public key to ec2-user
-  hosts: amazon_linux
-  become: true
-
-  vars:
-    ssh_public_key: "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC3..."
-
+- hosts: all
   tasks:
-    - name: Ensure .ssh directory exists
-      file:
-        path: /home/ec2-user/.ssh
+    - ansible.builtin.ping:
+```
+
+---
+
+## **2. Print Message**
+
+```yaml
+- hosts: all
+  tasks:
+    - debug:
+        msg: "Hello from Ansible!"
+```
+
+---
+
+## **3. Check Uptime**
+
+```yaml
+- hosts: all
+  tasks:
+    - shell: uptime
+      register: out
+    - debug:
+        var: out.stdout
+```
+
+---
+
+## **4. List Files in /etc**
+
+```yaml
+- hosts: all
+  tasks:
+    - shell: ls -l /etc
+      register: out
+    - debug:
+        var: out.stdout_lines
+```
+
+---
+
+## **5. Create File**
+
+```yaml
+- hosts: all
+  become: yes
+  tasks:
+    - file:
+        path: /tmp/ansible_test.txt
+        state: touch
+```
+
+---
+
+## **6. Write Content into File**
+
+```yaml
+- hosts: all
+  become: yes
+  tasks:
+    - copy:
+        dest: /tmp/message.txt
+        content: "This file was created using Ansible!"
+```
+
+---
+
+## **7. Create Directory**
+
+```yaml
+- hosts: all
+  become: yes
+  tasks:
+    - file:
+        path: /tmp/demo
         state: directory
-        mode: '0700'
-        owner: ec2-user
-        group: ec2-user
-
-    - name: Add SSH key to authorized_keys
-      authorized_key:
-        user: ec2-user
-        key: "{{ ssh_public_key }}"
+        mode: '0755'
 ```
 
 ---
 
-## 4. **Docker Installation on Amazon Linux 2**
+## **8. Remove a File**
 
 ```yaml
----
-- name: Install Docker on Amazon Linux 2
-  hosts: all
-  become: true
-
+- hosts: all
+  become: yes
   tasks:
-    - name: Install Docker package
-      yum:
-        name: docker
+    - file:
+        path: /tmp/ansible_test.txt
+        state: absent
+```
+
+---
+
+## **9. Install Package (tree)**
+
+```yaml
+- hosts: all
+  become: yes
+  tasks:
+    - yum:
+        name: tree
         state: present
+```
 
-    - name: Start and enable Docker service
-      systemd:
-        name: docker
+---
+
+## **10. Remove Package**
+
+```yaml
+- hosts: all
+  become: yes
+  tasks:
+    - yum:
+        name: tree
+        state: absent
+```
+
+---
+
+## **11. Start Service**
+
+```yaml
+- hosts: all
+  become: yes
+  tasks:
+    - service:
+        name: crond
         state: started
-        enabled: true
+```
 
-    - name: Add ec2-user to docker group
-      user:
+---
+
+## **12. Stop Service**
+
+```yaml
+- hosts: all
+  become: yes
+  tasks:
+    - service:
+        name: crond
+        state: stopped
+```
+
+---
+
+## **13. Add a User**
+
+```yaml
+- hosts: all
+  become: yes
+  tasks:
+    - user:
+        name: student
+        state: present
+```
+
+---
+
+## **14. Delete a User**
+
+```yaml
+- hosts: all
+  become: yes
+  tasks:
+    - user:
+        name: student
+        state: absent
+```
+
+---
+
+## **15. Install Package via Variable**
+
+```yaml
+- hosts: all
+  become: yes
+  vars:
+    pkg: httpd
+  tasks:
+    - yum:
+        name: "{{ pkg }}"
+        state: present
+```
+
+---
+
+## **16. Display Hostname**
+
+```yaml
+- hosts: all
+  tasks:
+    - debug:
+        msg: "Hostname: {{ inventory_hostname }}"
+```
+
+---
+
+## **17. Loop – Create Multiple Files**
+
+```yaml
+- hosts: all
+  become: yes
+  tasks:
+    - file:
+        path: "/tmp/{{ item }}"
+        state: touch
+      loop:
+        - f1.txt
+        - f2.txt
+        - f3.txt
+```
+
+---
+
+## **18. Check Memory (free -h)**
+
+```yaml
+- hosts: all
+  tasks:
+    - shell: free -h
+      register: mem
+    - debug:
+        var: mem.stdout_lines
+```
+
+---
+
+## **19. Check OS Version**
+
+```yaml
+- hosts: all
+  tasks:
+    - debug:
+        var: ansible_facts['distribution']
+```
+
+---
+
+## **20. Template Example**
+
+`play.yml`
+
+```yaml
+- hosts: all
+  become: yes
+  tasks:
+    - template:
+        src: templates/message.j2
+        dest: /tmp/message.txt
+```
+
+`templates/message.j2`
+
+```
+Hello from Ansible.
+Hostname: {{ ansible_hostname }}
+IP: {{ ansible_default_ipv4.address }}
+```
+
+---
+
+# 2️⃣ **INTERMEDIATE PLAYBOOKS (21–30)**
+
+---
+
+## **21. Install Multiple Packages**
+
+```yaml
+- hosts: all
+  become: yes
+  tasks:
+    - yum:
+        name: [git, tree, curl]
+        state: present
+```
+
+---
+
+## **22. Create Multiple Users**
+
+```yaml
+- hosts: all
+  become: yes
+  vars:
+    users: [dev1, dev2, dev3]
+  tasks:
+    - user:
+        name: "{{ item }}"
+      loop: "{{ users }}"
+```
+
+---
+
+## **23. Update All Packages**
+
+```yaml
+- hosts: all
+  become: yes
+  tasks:
+    - yum:
+        name: '*'
+        state: latest
+```
+
+---
+
+## **24. Create Directory Structure**
+
+```yaml
+- hosts: all
+  become: yes
+  tasks:
+    - file:
+        path: "/opt/app/{{ item }}"
+        state: directory
+      loop:
+        - logs
+        - config
+        - backups
+```
+
+---
+
+## **25. Delete Logs Older Than 7 Days**
+
+```yaml
+- hosts: all
+  become: yes
+  tasks:
+    - find:
+        paths: /var/log
+        age: 7d
+        recurse: yes
+      register: old_logs
+
+    - file:
+        path: "{{ item.path }}"
+        state: absent
+      loop: "{{ old_logs.files }}"
+```
+
+---
+
+## **26. Install & Configure Chrony**
+
+```yaml
+- hosts: all
+  become: yes
+  tasks:
+    - yum: { name: chrony, state: present }
+    - systemd: { name: chronyd, state: started, enabled: yes }
+```
+
+---
+
+## **27. sysctl Tuning**
+
+```yaml
+- hosts: all
+  become: yes
+  vars:
+    sysctl_values:
+      net.ipv4.ip_forward: 1
+      vm.swappiness: 10
+  tasks:
+    - sysctl:
+        name: "{{ item.key }}"
+        value: "{{ item.value }}"
+      loop: "{{ sysctl_values | dict2items }}"
+```
+
+---
+
+## **28. Add a Cron Job**
+
+```yaml
+- hosts: all
+  become: yes
+  tasks:
+    - cron:
+        name: "Daily Backup"
+        minute: "0"
+        hour: "1"
+        job: "/usr/bin/rsync -av /data /backup"
+```
+
+---
+
+## **29. Replace Text in File**
+
+```yaml
+- hosts: all
+  become: yes
+  tasks:
+    - replace:
+        path: /etc/myapp/config.conf
+        regexp: "127.0.0.1"
+        replace: "192.168.1.50"
+```
+
+---
+
+## **30. Configure Firewalld**
+
+```yaml
+- hosts: all
+  become: yes
+  tasks:
+    - yum: { name: firewalld, state: present }
+    - systemd: { name: firewalld, state: started, enabled: yes }
+    - firewalld:
+        port: 8080/tcp
+        permanent: yes
+        state: enabled
+    - firewalld:
+        state: reloaded
+        immediate: yes
+```
+
+---
+
+# 3️⃣ **ADVANCED PLAYBOOKS (31–42)**
+
+Cloud, Docker, Jenkins, HAProxy, Security, Kubernetes.
+
+---
+
+## **31. Install Docker (Amazon Linux / RHEL)**
+
+```yaml
+- hosts: all
+  become: yes
+  tasks:
+    - yum: { name: docker, state: present }
+    - systemd: { name: docker, state: started, enabled: yes }
+    - user:
         name: ec2-user
         groups: docker
         append: yes
@@ -156,527 +460,222 @@ ssh-copy-id user@your-server
 
 ---
 
-## 5. **Custom Yum Repo and Package Installation**
+## **32. Install Jenkins**
 
 ```yaml
----
-- name: Add custom Yum repo and install package
-  hosts: amazon_linux
-  become: true
-
+- hosts: jenkins
+  become: yes
   tasks:
-    - name: Add custom repository
-      yum_repository:
-        name: custom-repo
-        description: Custom YUM Repo
-        baseurl: http://repo.example.com/yum
-        enabled: yes
-        gpgcheck: no
-
-    - name: Install package from custom repo
-      yum:
-        name: custom-package
+    - yum: { name: java-11-openjdk, state: present }
+    - get_url:
+        url: https://pkg.jenkins.io/redhat-stable/jenkins.repo
+        dest: /etc/yum.repos.d/jenkins.repo
+    - rpm_key:
         state: present
+        key: https://pkg.jenkins.io/redhat-stable/jenkins.io.key
+    - yum: { name: jenkins, state: present }
+    - systemd: { name: jenkins, state: started, enabled: yes }
 ```
 
 ---
 
-## 6. **Nginx Installation & Reverse Proxy Configuration**
+## **33. Configure Nginx Load Balancer**
 
 ```yaml
----
-- name: Install and configure Nginx as reverse proxy
-  hosts: all
-  become: true
-
+- hosts: lb
+  become: yes
+  vars:
+    backends:
+      - 192.168.1.10
+      - 192.168.1.20
   tasks:
-    - name: Install Nginx
-      yum:
-        name: nginx
-        state: present
+    - yum: { name: nginx, state: present }
+    - template:
+        src: templates/lb.conf.j2
+        dest: /etc/nginx/conf.d/lb.conf
+    - systemd: { name: nginx, state: restarted }
+```
 
-    - name: Start and enable Nginx
-      systemd:
-        name: nginx
-        state: started
-        enabled: true
+---
 
-    - name: Configure Nginx reverse proxy
-      copy:
-        dest: /etc/nginx/conf.d/reverse-proxy.conf
+## **34. Install & Configure HAProxy**
+
+```yaml
+- hosts: lb
+  become: yes
+  tasks:
+    - yum: { name: haproxy, state: present }
+    - copy:
+        dest: /etc/haproxy/haproxy.cfg
         content: |
-          server {
-              listen 80;
-              location / {
-                  proxy_pass http://localhost:5000;
-              }
-          }
-
-    - name: Restart Nginx to apply config
-      systemd:
-        name: nginx
-        state: restarted
+          frontend http_front
+            bind *:80
+            default_backend http_back
+          backend http_back
+            balance roundrobin
+            server web1 192.168.1.10:80
+            server web2 192.168.1.11:80
+    - systemd: { name: haproxy, state: restarted }
 ```
 
 ---
 
-## 7. **Create Users & Add to Sudoers**
+## **35. Install MySQL Server**
 
 ```yaml
----
-- name: Create user and configure sudo access
-  hosts: amazon_linux
-  become: true
+- hosts: db
+  become: yes
+  tasks:
+    - yum: { name: mariadb-server, state: present }
+    - systemd: { name: mariadb, state: started, enabled: yes }
+```
 
+---
+
+## **36. Create MySQL DB + User**
+
+```yaml
+- hosts: db
+  become: yes
   vars:
-    new_user: devopsadmin
-
+    db: devopsdb
+    user: devops
+    pass: DevOps@123
   tasks:
-    - name: Create a new user
-      user:
-        name: "{{ new_user }}"
-        shell: /bin/bash
-        create_home: yes
-
-    - name: Add user to wheel group (sudoers)
-      user:
-        name: "{{ new_user }}"
-        groups: wheel
-        append: yes
-
-    - name: Set authorized key for SSH access
-      authorized_key:
-        user: "{{ new_user }}"
-        key: "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQD..."
-```
-
----
-
-## 8. **Install Python3 and Pip**
-
-```yaml
----
-- name: Install Python3 and pip on Amazon Linux
-  hosts: all
-  become: true
-
-  tasks:
-    - name: Install Python3
-      yum:
-        name: python3
+    - mysql_db:
+        name: "{{ db }}"
         state: present
-
-    - name: Install pip3
-      command: python3 -m ensurepip
-      args:
-        creates: /usr/local/bin/pip3
+    - mysql_user:
+        name: "{{ user }}"
+        password: "{{ pass }}"
+        priv: "{{ db }}.*:ALL"
+        state: present
 ```
 
 ---
 
-## 9. **Mount EBS Volume to Amazon Linux**
+## **37. Add SSH Key to ec2-user**
 
 ```yaml
----
-- name: Format and mount EBS volume
-  hosts: amazon_linux
-  become: true
-
+- hosts: amazon_linux
+  become: yes
   vars:
-    device_name: /dev/xvdf
-    mount_point: /mnt/data
-
+    sshkey: "ssh-rsa AAA..."
   tasks:
-    - name: Create filesystem on the EBS volume
-      filesystem:
+    - authorized_key:
+        user: ec2-user
+        key: "{{ sshkey }}"
+```
+
+---
+
+## **38. Mount EBS Volume**
+
+```yaml
+- hosts: amazon_linux
+  become: yes
+  vars:
+    device: /dev/xvdf
+    mountp: /mnt/data
+  tasks:
+    - filesystem:
         fstype: ext4
-        dev: "{{ device_name }}"
-      when: device_name is defined
-
-    - name: Create mount point directory
-      file:
-        path: "{{ mount_point }}"
+        dev: "{{ device }}"
+    - file:
+        path: "{{ mountp }}"
         state: directory
-
-    - name: Mount the EBS volume
-      mount:
-        path: "{{ mount_point }}"
-        src: "{{ device_name }}"
+    - mount:
+        path: "{{ mountp }}"
+        src: "{{ device }}"
         fstype: ext4
         state: mounted
-
-    - name: Persist mount in fstab
-      mount:
-        path: "{{ mount_point }}"
-        src: "{{ device_name }}"
-        fstype: ext4
-        opts: defaults
-        state: present
 ```
 
 ---
 
-## 10. **Fail2Ban Installation for Security**
+## **39. Install Fail2Ban**
 
 ```yaml
----
-- name: Install and configure Fail2Ban on Amazon Linux
-  hosts: amazon_linux
-  become: true
-
+- hosts: all
+  become: yes
   tasks:
-    - name: Install EPEL repository (needed for fail2ban)
-      yum:
-        name: epel-release
-        state: present
-
-    - name: Install fail2ban
-      yum:
-        name: fail2ban
-        state: present
-
-    - name: Start and enable fail2ban
-      systemd:
-        name: fail2ban
-        state: started
-        enabled: true
-
-    - name: Deploy fail2ban jail configuration
-      copy:
-        dest: /etc/fail2ban/jail.local
-        content: |
-          [sshd]
-          enabled = true
-          port    = ssh
-          logpath = /var/log/secure
-          maxretry = 5
+    - yum: { name: epel-release, state: present }
+    - yum: { name: fail2ban, state: present }
+    - systemd: { name: fail2ban, state: started, enabled: yes }
 ```
 
 ---
 
-## 11. **Prometheus Node Exporter Setup**
+## **40. Install Prometheus Node Exporter**
 
 ```yaml
----
-- name: Install Prometheus Node Exporter on Amazon Linux
-  hosts: amazon_linux
-  become: true
-
+- hosts: all
+  become: yes
   tasks:
-    - name: Download node exporter binary
-      get_url:
+    - get_url:
         url: https://github.com/prometheus/node_exporter/releases/download/v1.3.1/node_exporter-1.3.1.linux-amd64.tar.gz
-        dest: /tmp/node_exporter.tar.gz
-
-    - name: Extract node exporter
-      unarchive:
-        src: /tmp/node_exporter.tar.gz
+        dest: /tmp/ne.tar.gz
+    - unarchive:
+        src: /tmp/ne.tar.gz
         dest: /opt/
         remote_src: yes
-
-    - name: Create systemd service for node exporter
-      copy:
+    - copy:
         dest: /etc/systemd/system/node_exporter.service
         content: |
-          [Unit]
-          Description=Node Exporter
-          After=network.target
-
           [Service]
-          User=nobody
           ExecStart=/opt/node_exporter-1.3.1.linux-amd64/node_exporter
-
-          [Install]
-          WantedBy=default.target
-
-    - name: Start and enable node exporter
-      systemd:
+    - systemd:
         name: node_exporter
         state: started
-        enabled: true
-```
-
----
-
-## 12. **UFW (Firewall) Configuration Example**
-
-```yaml
----
-- name: Install and configure UFW firewall on Amazon Linux
-  hosts: amazon_linux
-  become: true
-
-  tasks:
-    - name: Install UFW
-      yum:
-        name: ufw
-        state: present
-
-    - name: Allow SSH
-      ufw:
-        rule: allow
-        name: OpenSSH
-
-    - name: Allow HTTP
-      ufw:
-        rule: allow
-        port: '80'
-
-    - name: Enable UFW
-      ufw:
-        state: enabled
-        direction: incoming
-        policy: deny
-```
-
----
-
-## Inventory File Example (`hosts`)
-
-```ini
-[amazon_linux]
-ec2-54-123-45-67.compute-1.amazonaws.com ansible_user=ec2-user ansible_ssh_private_key_file=~/.ssh/my-key.pem
-```
-
----
-
-## Run Command
-
-```bash
-ansible-playbook -i hosts playbook.yml
-```
-
-Here’s a **collection of basic Ansible YAML playbooks** that you can directly use for learning, practice, or automation labs 👇
-
----
-
-## 🧩 **1. Basic Ping Playbook**
-
-Checks connectivity to managed nodes.
-
-```yaml
----
-- name: Ping all hosts
-  hosts: all
-  tasks:
-    - name: Test connectivity
-      ansible.builtin.ping:
-```
-
----
-
-## ⚙️ **2. Install a Package**
-
-Installs Apache (httpd) on RedHat-based systems.
-
-```yaml
----
-- name: Install Apache Web Server
-  hosts: webservers
-  become: yes
-  tasks:
-    - name: Install httpd
-      ansible.builtin.yum:
-        name: httpd
-        state: present
-```
-
----
-
-## 🧰 **3. Start & Enable Service**
-
-```yaml
----
-- name: Ensure Apache is started and enabled
-  hosts: webservers
-  become: yes
-  tasks:
-    - name: Start and enable httpd
-      ansible.builtin.service:
-        name: httpd
-        state: started
         enabled: yes
 ```
 
 ---
 
-## 📄 **4. Copy a File to Remote Server**
+## **41. Install kubectl (Kubernetes CLI)**
 
 ```yaml
----
-- name: Copy index.html to webservers
-  hosts: webservers
+- hosts: all
   become: yes
   tasks:
-    - name: Copy file
-      ansible.builtin.copy:
-        src: files/index.html
-        dest: /var/www/html/index.html
-        owner: root
-        group: root
-        mode: '0644'
+    - get_url:
+        url: https://storage.googleapis.com/kubernetes-release/release/v1.27.0/bin/linux/amd64/kubectl
+        dest: /usr/local/bin/kubectl
+        mode: '0755'
 ```
 
 ---
 
-## 🔧 **5. Create a User**
+## **42. Create Kubernetes Namespace + Pod**
 
 ```yaml
----
-- name: Create a new user
-  hosts: all
-  become: yes
+- hosts: localhost
   tasks:
-    - name: Add devops user
-      ansible.builtin.user:
-        name: devops
+    - kubernetes.core.k8s:
         state: present
-        groups: wheel
+        definition:
+          apiVersion: v1
+          kind: Namespace
+          metadata:
+            name: devops
 ```
 
----
-
-## 🧹 **6. Remove a Package**
-
 ```yaml
----
-- name: Remove Apache Web Server
-  hosts: webservers
-  become: yes
+- hosts: localhost
   tasks:
-    - name: Remove httpd
-      ansible.builtin.yum:
-        name: httpd
-        state: absent
-```
-
----
-
-## 🧾 **7. Gather Facts**
-
-```yaml
----
-- name: Display system facts
-  hosts: all
-  tasks:
-    - name: Print OS details
-      ansible.builtin.debug:
-        var: ansible_facts['os_family']
-```
-
----
-
-## 🔄 **8. Restart Service**
-
-```yaml
----
-- name: Restart Apache
-  hosts: webservers
-  become: yes
-  tasks:
-    - name: Restart httpd
-      ansible.builtin.service:
-        name: httpd
-        state: restarted
-```
-
----
-
-## 🌐 **9. Deploy Simple Web Page**
-
-Combines multiple tasks (install, copy, start service).
-
-```yaml
----
-- name: Deploy a simple web page
-  hosts: webservers
-  become: yes
-  tasks:
-    - name: Install Apache
-      ansible.builtin.yum:
-        name: httpd
+    - kubernetes.core.k8s:
         state: present
-
-    - name: Copy index file
-      ansible.builtin.copy:
-        src: files/index.html
-        dest: /var/www/html/index.html
-
-    - name: Start and enable service
-      ansible.builtin.service:
-        name: httpd
-        state: started
-        enabled: yes
+        definition:
+          apiVersion: v1
+          kind: Pod
+          metadata:
+            name: nginx-pod
+            namespace: devops
+          spec:
+            containers:
+              - name: nginx
+                image: nginx
 ```
 
 ---
 
-## 🗂 **10. Template Example**
-
-Using Jinja2 template for dynamic content.
-
-```yaml
----
-- name: Deploy a template file
-  hosts: webservers
-  become: yes
-  tasks:
-    - name: Copy template
-      ansible.builtin.template:
-        src: templates/index.j2
-        dest: /var/www/html/index.html
-```
-
-**Example template (`templates/index.j2`):**
-
-```jinja2
-<html>
-  <body>
-    <h1>Welcome to {{ ansible_hostname }}</h1>
-    <p>Server IP: {{ ansible_default_ipv4.address }}</p>
-  </body>
-</html>
-```
-
----
-
-## 📦 **11. Install Multiple Packages**
-
-```yaml
----
-- name: Install multiple packages
-  hosts: all
-  become: yes
-  tasks:
-    - name: Install git, tree, and curl
-      ansible.builtin.yum:
-        name:
-          - git
-          - tree
-          - curl
-        state: present
-```
-
----
-
-## 🧮 **12. Use Variables**
-
-```yaml
----
-- name: Install package using variables
-  hosts: all
-  become: yes
-  vars:
-    pkg_name: httpd
-  tasks:
-    - name: Install {{ pkg_name }}
-      ansible.builtin.yum:
-        name: "{{ pkg_name }}"
-        state: present
-```
-
----
-
-Would you like me to create a **GitHub-ready structure** (with `inventory`, `files/`, `templates/`, and `site.yml`) containing these 10+ playbooks as examples for your students or project repo (e.g., `ansible-basic-lab`)?
-
----
