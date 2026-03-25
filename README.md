@@ -288,8 +288,12 @@ IP: {{ ansible_default_ipv4.address }}
 - hosts: all
   become: yes
   tasks:
-    - yum:
-        name: [git, tree, curl]
+    - name: Install packages
+      yum:
+        name:
+          - git
+          - tree
+          - curl-minimal
         state: present
 ```
 
