@@ -1,4 +1,4 @@
-# 🚀 **ANSIBLE PLAYBOOKS — COMPLETE & ORGANIZED**
+# 🚀 **ANSIBLE PLAYBOOKS**
 
 **Basic → Intermediate → Advanced (AWS, Linux, Docker, Security, Kubernetes)**
 
