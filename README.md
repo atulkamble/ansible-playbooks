@@ -26,7 +26,7 @@ Fundamental operations, ideal for beginners.
 - hosts: all
   tasks:
     - debug:
-        msg: "Hello from Ansible!"
+        msg: "Hello from {{ ansible_hostname }}!"
 ```
 
 ---
