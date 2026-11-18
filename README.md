@@ -467,16 +467,16 @@ Cloud, Docker, Jenkins, HAProxy, Security, Kubernetes.
 ## **32. Install Jenkins**
 
 ```yaml
-- hosts: jenkins
+- hosts: all
   become: yes
   tasks:
-    - yum: { name: java-11-openjdk, state: present }
+    - yum: { name: java-21-amazon-corretto-devel.x86_64, state: present }
     - get_url:
-        url: https://pkg.jenkins.io/redhat-stable/jenkins.repo
+        url: https://pkg.jenkins.io/rpm-stable/jenkins.repo
         dest: /etc/yum.repos.d/jenkins.repo
     - rpm_key:
         state: present
-        key: https://pkg.jenkins.io/redhat-stable/jenkins.io.key
+        key: https://pkg.jenkins.io/rpm-stable/jenkins.io.key
     - yum: { name: jenkins, state: present }
     - systemd: { name: jenkins, state: started, enabled: yes }
 ```
