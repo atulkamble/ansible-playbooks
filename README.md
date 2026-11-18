@@ -530,7 +530,7 @@ Cloud, Docker, Jenkins, HAProxy, Security, Kubernetes.
 - hosts: db
   become: yes
   tasks:
-    - yum: { name: mariadb-server, state: present }
+    - dnf: { name: mariadb105-server, state: present }
     - systemd: { name: mariadb, state: started, enabled: yes }
 ```
 
